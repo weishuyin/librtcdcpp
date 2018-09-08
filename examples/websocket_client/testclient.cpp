@@ -106,6 +106,7 @@ int main() {
 
         std::cout << "Sending Answer: " << answer << "\n";
         ws.Send(Json::writeString(msgBuilder, answer));
+        pc->GatherCandidates();
       } else if (root["type"] == "candidate") {
         pc->SetRemoteIceCandidate("a=" + root["msg"]["candidate"].asString());
       }

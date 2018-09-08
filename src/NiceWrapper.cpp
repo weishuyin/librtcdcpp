@@ -168,24 +168,6 @@ bool NiceWrapper::Initialize() {
     throw std::invalid_argument("Only up to one ICE server is currently supported");
   }
 
-  for (auto ice_server : config.ice_servers) {
-    struct hostent *stun_host = gethostbyname(ice_server.hostname.c_str());
-    if (stun_host == nullptr) {
-      logger->warn("Failed to lookup host for server: {}", ice_server);
-    } else {
-      in_addr *address = (in_addr *)stun_host->h_addr;
-      const char *ip_address = inet_ntoa(*address);
-
-      g_object_set(G_OBJECT(agent.get()), "stun-server", ip_address, NULL);
-    }
-
-    if (ice_server.port > 0) {
-      g_object_set(G_OBJECT(agent.get()), "stun-server-port", ice_server.port, NULL);
-    } else {
-      logger->error("stun port empty");
-    }
-  }
-
   g_signal_connect(G_OBJECT(agent.get()), "candidate-gathering-done", G_CALLBACK(candidate_gathering_done), this);
   g_signal_connect(G_OBJECT(agent.get()), "component-state-changed", G_CALLBACK(component_state_changed), this);
   g_signal_connect(G_OBJECT(agent.get()), "new-candidate-full", G_CALLBACK(new_local_candidate), this);
@@ -198,6 +180,34 @@ bool NiceWrapper::Initialize() {
   }
 
   nice_agent_set_stream_name(agent.get(), this->stream_id, "application");
+
+  for (auto ice_server : config.ice_servers) {
+    bool is_turn = false;
+    if (g_str_has_prefix(ice_server.hostname.c_str(), "turn:") || g_str_has_prefix(ice_server.hostname.c_str(), "turns:")) {
+      is_turn = true;
+    }
+    std::size_t pos = ice_server.hostname.find(":");
+    std::string hostname = ice_server.hostname.substr(pos+1);
+    struct hostent *host = gethostbyname(hostname.c_str());
+    if (host == nullptr) {
+      logger->warn("Failed to lookup host for server: {}", ice_server);
+    } else {
+      in_addr *address = (in_addr *)host->h_addr;
+      const char *ip_address = inet_ntoa(*address);
+
+      if (ice_server.port <= 0) {
+        logger->error("stun port empty");
+        continue;
+      }
+
+      if (is_turn) {
+        nice_agent_set_relay_info(agent.get(), this->stream_id, 1, ip_address, ice_server.port, ice_server.username.c_str(), ice_server.credential.c_str(), ice_server.type);
+      } else {
+        g_object_set(G_OBJECT(agent.get()), "stun-server", ip_address, NULL);
+        g_object_set(G_OBJECT(agent.get()), "stun-server-port", ice_server.port, NULL);
+      }
+    }
+  }
 
   if (!config.ice_ufrag.empty() && !config.ice_pwd.empty()) {
     nice_agent_set_local_credentials(agent.get(), this->stream_id, config.ice_ufrag.c_str(), config.ice_pwd.c_str());
@@ -239,10 +249,6 @@ void NiceWrapper::ParseRemoteSDP(std::string remote_sdp) {
     throw std::runtime_error("ParseRemoteSDP: " + std::string(strerror(rc)));
   } else {
     logger->info("ICE: Added {} Candidates", rc);
-  }
-
-  if (!nice_agent_gather_candidates(agent.get(), this->stream_id)) {
-    throw std::runtime_error("ParseRemoteSDP: Error gathering candidates!");
   }
 }
 
@@ -291,6 +297,10 @@ std::string NiceWrapper::GenerateLocalSDP() {
   }
   g_free(raw_sdp);
   return result.str();
+}
+
+bool NiceWrapper::GatherCandidates() {
+  return nice_agent_gather_candidates(agent.get(), this->stream_id);
 }
 
 bool NiceWrapper::SetRemoteIceCandidate(string candidate_sdp) {

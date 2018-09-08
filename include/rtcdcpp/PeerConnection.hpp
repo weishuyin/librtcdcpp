@@ -31,6 +31,7 @@
 #include "DataChannel.hpp"
 #include "RTCCertificate.hpp"
 #include "Logging.hpp"
+#include <nice/agent.h>
 #include <atomic>
 #include <map>
 
@@ -43,6 +44,9 @@ class SCTPWrapper;
 struct RTCIceServer {
   std::string hostname;
   int port;
+  std::string username;
+  std::string credential;
+  NiceRelayType type = NICE_RELAY_TYPE_TURN_UDP;
 };
 
 std::ostream &operator<<(std::ostream &os, const RTCIceServer &ice_server);
@@ -84,6 +88,11 @@ class PeerConnection {
    * Generate Answer SDP
    */
   std::string GenerateAnswer();
+
+  /**
+   * Gather the local candidates
+   */
+  bool GatherCandidates();
 
   /**
   * Handle remote ICE Candidate.

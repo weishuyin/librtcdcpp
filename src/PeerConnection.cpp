@@ -150,6 +150,10 @@ std::string PeerConnection::GenerateAnswer() {
   return sdp.str();
 }
 
+bool PeerConnection::GatherCandidates() {
+  return this->nice->GatherCandidates();
+}
+
 bool PeerConnection::SetRemoteIceCandidate(string candidate_sdp) { return this->nice->SetRemoteIceCandidate(candidate_sdp); }
 
 bool PeerConnection::SetRemoteIceCandidates(vector<string> candidate_sdps) { return this->nice->SetRemoteIceCandidates(candidate_sdps); }

@@ -70,6 +70,9 @@ class NiceWrapper {
   // Generate the local SDP
   std::string GenerateLocalSDP();
 
+  // Gather the local candidates
+  bool GatherCandidates();
+
   // Add a single remote ice candidate (supports trickling)
   bool SetRemoteIceCandidate(std::string candidate_sdp);
 
