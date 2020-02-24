@@ -314,7 +314,11 @@ void SCTPWrapper::GSForSCTP(ChunkPtr chunk, uint16_t sid, uint32_t ppid) {
   while (tries < 5) {
     ssize_t bytes_write = 0;
     while (bytes_write < chunk->Length()) {
-      ssize_t ret = usrsctp_sendv(this->sock, &chunk->Data()[bytes_write], chunk->Length() - bytes_write, NULL, 0, &spa, sizeof(spa), SCTP_SENDV_SPA, 0);
+      ssize_t bytes_want = chunk->Length() - bytes_write;
+      if (bytes_want > 65000) {
+        bytes_want = 65000;
+      }
+      ssize_t ret = usrsctp_sendv(this->sock, &chunk->Data()[bytes_write], bytes_want, NULL, 0, &spa, sizeof(spa), SCTP_SENDV_SPA, 0);
       if (ret == -1) {
         if (errno == EINTR) {
           continue;
