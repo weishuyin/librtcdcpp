@@ -71,8 +71,8 @@ class PeerConnection {
 
   using IceCandidateCallbackPtr = std::function<void(IceCandidate)>;
   using DataChannelCallbackPtr = std::function<void(std::shared_ptr<DataChannel> channel)>;
-
-  PeerConnection(const RTCConfiguration &config, IceCandidateCallbackPtr icCB, DataChannelCallbackPtr dcCB);
+  using IceStateChangePtr = std::function<void(uint32_t)>;
+  PeerConnection(const RTCConfiguration &config, IceCandidateCallbackPtr icCB, DataChannelCallbackPtr dcCB, IceStateChangePtr stateCB = NULL);
 
   virtual ~PeerConnection();
 
@@ -130,13 +130,16 @@ class PeerConnection {
   /* Internal Callback Handlers */
   void OnLocalIceCandidate(std::string &ice_candidate);
   void OnIceReady();
+  void OnIceStateChange(uint32_t state);
   void OnDTLSHandshakeDone();
   void OnSCTPMsgReceived(ChunkPtr chunk, uint16_t sid, uint32_t ppid);
+  void OnSCTPStreamReseted(uint16_t *streams, uint32_t len);
 
  private:
   RTCConfiguration config_;
   const IceCandidateCallbackPtr ice_candidate_cb;
   const DataChannelCallbackPtr new_channel_cb;
+  const IceStateChangePtr ice_state_change_cb;
 
   std::string mid;
 

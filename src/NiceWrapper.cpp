@@ -111,6 +111,7 @@ void NiceWrapper::OnStateChange(uint32_t stream_id, uint32_t component_id, uint3
       SPDLOG_TRACE(logger, "ICE: Unknown state: {}", state);
       break;
   }
+  this->peer_connection->OnIceStateChange(state);
 }
 
 // TODO: Turn this into a callback

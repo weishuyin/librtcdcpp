@@ -47,8 +47,9 @@ class SCTPWrapper {
  public:
   using MsgReceivedCallbackPtr = std::function<void(ChunkPtr chunk, uint16_t sid, uint32_t ppid)>;
   using DTLSEncryptCallbackPtr = std::function<void(ChunkPtr)>;
+  using StreamResetCallbackPtr = std::function<void(uint16_t *streams, uint32_t len)>;
 
-  SCTPWrapper(DTLSEncryptCallbackPtr dtlsEncryptCB, MsgReceivedCallbackPtr msgReceivedCB);
+  SCTPWrapper(DTLSEncryptCallbackPtr dtlsEncryptCB, MsgReceivedCallbackPtr msgReceivedCB, StreamResetCallbackPtr streamResetCB);
   virtual ~SCTPWrapper();
 
   bool Initialize();
@@ -81,6 +82,7 @@ class SCTPWrapper {
 
   const DTLSEncryptCallbackPtr dtlsEncryptCallback;
   const MsgReceivedCallbackPtr msgReceivedCallback;
+  const StreamResetCallbackPtr streamResetCallback;
 
   std::atomic<bool> should_stop{false};
   std::thread recv_thread;

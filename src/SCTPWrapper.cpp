@@ -37,12 +37,13 @@ namespace rtcdcpp {
 
 using namespace std;
 
-SCTPWrapper::SCTPWrapper(DTLSEncryptCallbackPtr dtlsEncryptCB, MsgReceivedCallbackPtr msgReceivedCB)
+SCTPWrapper::SCTPWrapper(DTLSEncryptCallbackPtr dtlsEncryptCB, MsgReceivedCallbackPtr msgReceivedCB, StreamResetCallbackPtr streamResetCB)
     : local_port(5000),  // XXX: Hard-coded for now
       remote_port(5000),
       stream_cursor(0),
       dtlsEncryptCallback(dtlsEncryptCB),
-      msgReceivedCallback(msgReceivedCB) {}
+      msgReceivedCallback(msgReceivedCB),
+      streamResetCallback(streamResetCB) {}
 
 SCTPWrapper::~SCTPWrapper() {
   Stop();
@@ -98,6 +99,15 @@ void SCTPWrapper::OnNotification(union sctp_notification *notify, size_t len) {
       break;
     case SCTP_STREAM_RESET_EVENT:
       SPDLOG_TRACE(logger, "OnNotification(type=SCTP_STREAM_RESET_EVENT)");
+      /*  https://tools.ietf.org/html/rfc6525
+       *  strreset_length:  This field is the total length in bytes of the
+       *    delivered event, including the header.
+       *  strreset_stream_list:  This is the list of stream identifiers to
+       *    which this event refers.  An empty list identifies all streams as
+       *    being reset.  Depending on strreset_flags, the identifiers refer
+       *    to incoming or outgoing streams, or both.
+       */
+      streamResetCallback(notify->sn_strreset_event.strreset_stream_list, (notify->sn_strreset_event.strreset_length - 12)/2);
       break;
     case SCTP_ASSOC_RESET_EVENT:
       SPDLOG_TRACE(logger, "OnNotification(type=SCTP_ASSOC_RESET_EVENT)");

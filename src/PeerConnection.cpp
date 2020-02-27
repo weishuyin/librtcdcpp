@@ -44,8 +44,8 @@ using namespace std;
 
 std::ostream &operator<<(std::ostream &os, const RTCIceServer &ice_server) { return os << ice_server.hostname << ":" << ice_server.port; }
 
-PeerConnection::PeerConnection(const RTCConfiguration &config, IceCandidateCallbackPtr icCB, DataChannelCallbackPtr dcCB)
-    : config_(config), ice_candidate_cb(icCB), new_channel_cb(dcCB) {
+PeerConnection::PeerConnection(const RTCConfiguration &config, IceCandidateCallbackPtr icCB, DataChannelCallbackPtr dcCB, IceStateChangePtr stateCB)
+    : config_(config), ice_candidate_cb(icCB), new_channel_cb(dcCB), ice_state_change_cb(stateCB) {
   if (config_.certificates.empty()) {
     config_.certificates.push_back(RTCCertificate::GenerateCertificate("rtcdcpp", 365));
   }
@@ -65,7 +65,8 @@ bool PeerConnection::Initialize() {
   this->dtls = make_unique<DTLSWrapper>(this);
   this->sctp = make_unique<SCTPWrapper>(
       std::bind(&DTLSWrapper::EncryptData, dtls.get(), std::placeholders::_1),
-      std::bind(&PeerConnection::OnSCTPMsgReceived, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+      std::bind(&PeerConnection::OnSCTPMsgReceived, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+      std::bind(&PeerConnection::OnSCTPStreamReseted, this, std::placeholders::_1, std::placeholders::_2));
 
   if (!dtls->Initialize()) {
     logger->error("DTLS failure");
@@ -179,6 +180,12 @@ void PeerConnection::OnIceReady() {
   }
 }
 
+void PeerConnection::OnIceStateChange(uint32_t state) {
+  if (this->ice_state_change_cb) {
+    this->ice_state_change_cb(state);
+  }
+}
+
 void PeerConnection::OnDTLSHandshakeDone() {
   SPDLOG_TRACE(logger, "OnDTLSHandshakeDone(): Time to get the SCTP party started");
   this->sctp->Start();
@@ -206,6 +213,28 @@ void PeerConnection::OnSCTPMsgReceived(ChunkPtr chunk, uint16_t sid, uint32_t pp
     HandleBinaryMessage(chunk, sid);
   } else {
     logger->error("Unknown ppid={}", ppid);
+  }
+}
+
+void PeerConnection::OnSCTPStreamReseted(uint16_t *streams, uint32_t len) {
+  if (len == 0) {
+    auto iter = data_channels.begin();
+    while (iter != data_channels.end()) {
+      iter->second->OnClosed();
+      iter++;
+    }
+    data_channels.clear();
+  } else {
+    for (int i = 0; i < len; i++) {
+      uint16_t sid = streams[i];
+      auto cur_channel = GetChannel(sid);
+      if (!cur_channel) {
+        logger->warn("Reseted on unknown channel: {}", sid);
+        return;
+      }
+      cur_channel->OnClosed();
+      data_channels.erase(sid);
+    }
   }
 }
 
